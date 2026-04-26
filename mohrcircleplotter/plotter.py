@@ -18,6 +18,152 @@ from matplotlib.axes import Axes
 import numpy as np
 from typing import Any, Sequence
 
+def principal_stress_circle(
+    p1: float | None = None,
+    p2: float | None = None,
+    p3: float | None = None,
+    ax: Axes | None = None,
+    num_points: int = 100,
+    **kwargs: Any
+) -> Circle:
+    """Create a Mohr circle from principal stresses.
+
+    Args:
+        p1: Maximum principal stress.
+        p2: Intermediate (or minimum) principal stress.
+        p3: Minimum principal stress (if 3D).
+        ax: Optional Matplotlib Axes to plot on. If None, uses current axes.
+        num_points: Number of points to use for plotting the circle perimeter.
+        kwargs: Additional keyword arguments. Recognized:
+            halfplot (bool): If True, only plot the upper half of the circle.
+            matplotlib.axes.Axes.plot kwargs: Any additional kwargs are forwarded to the ax.plot call for the circle.
+    """
+    halfplot = False
+    if 'halfplot' in kwargs:
+        halfplot = kwargs['halfplot']
+        del kwargs['halfplot']
+    if ax is None:
+        ax = plt.gca()
+
+    circle = Circle(p1=p1, p2=p2, p3=p3)
+    x, y = circle.get_circle_points(num_points=num_points, half_circle=halfplot)
+    ax.plot(x, y, **kwargs)
+    return circle
+
+def oriented_circle(
+    sigma_x: float,
+    sigma_y: float,
+    tau_xy: float,
+    show_plane: bool = True,
+    ax: Axes | None = None,
+    num_points: int = 100,
+    **kwargs: Any
+) -> Circle:
+    """Create a Mohr circle from oriented plane stresses.
+
+    Args:
+        sigma_x: Normal stress in x-direction.
+        sigma_y: Normal stress in y-direction.
+        tau_xy: Shear stress on xy-plane.
+        show_plane: Whether to plot the plane orientation line.
+        label: Optional legend label for the circle.
+        ax: Optional Matplotlib Axes to plot on. If None, uses current axes.
+        num_points: Number of points to use for plotting the circle perimeter.
+        kwargs: Additional keyword arguments. Recognized:
+            halfplot (bool): If True, only plot the upper half of the circle.
+            matplotlib.axes.Axes.plot kwargs: Any additional kwargs are forwarded to the ax.plot call for the circle. 
+    """
+    halfplot = False
+    if 'halfplot' in kwargs:
+        halfplot = kwargs['halfplot']
+        del kwargs['halfplot']
+    if ax is None:
+        ax = plt.gca()
+
+    circle = Circle(sigma_x=sigma_x, sigma_y=sigma_y, tau_xy=tau_xy)
+    x, y = circle.get_circle_points(num_points=num_points, half_circle=halfplot)
+    ax.plot(x, y, **kwargs)
+    if show_plane:
+        x_plane, y_plane = circle.get_plane(circle.x_plane_angle)
+        ax.plot(x_plane, y_plane, 'r--', label=f'Oriented Plane (θ={np.degrees(circle.x_plane_angle):.2f}°)')
+    return circle
+
+def mc_envelope(
+        c: float,
+        phi_radians: float,
+        parameters_label: bool = False,
+        show_tension: bool = False,
+        ax: Axes | None = None,
+) -> None:
+    """Plot a Mohr-Coulomb failure envelope.
+
+    Args:
+        c: Cohesion intercept.
+        phi_radians: Friction angle in radians.
+        parameters_label: Whether to annotate the envelope parameters on the plot.
+        ax: Optional Axes to plot on. If None, uses current axes.
+    """
+    if ax is None:
+        ax = plt.gca()
+    p_coulomb = np.linspace(
+        0 if not show_tension else -c/np.tan(phi_radians), 
+        ax.get_xlim()[1]*1.05, 100)
+    q_coulomb = c + p_coulomb * np.tan(phi_radians)
+    ax.plot(p_coulomb, q_coulomb, 'k--', label=f'Mohr-Coulomb Envelope (φ={np.degrees(phi_radians):.2f}°, c={c:.2f})')
+    if parameters_label:
+        label = f'c={c:.2f}\nφ={np.degrees(phi_radians):.2f}°'
+        ax.annotate(label, xy=(p_coulomb[-1], q_coulomb[-1]), xytext=(20, 10), textcoords='offset points')
+
+def estimated_mc_envelope(
+    circles: Sequence[Circle],
+    parameters_label: bool = False,
+    show_tension: bool = False,
+    ax: Axes | None = None,
+    report_params: bool = True,
+    **kwargs: Any
+) -> None:
+    """Estimate and plot a linear Mohr-Coulomb envelope from given circles.
+
+    Args:
+        circles: Sequence of Circle objects to use for envelope estimation.
+        parameters_label: Whether to annotate the envelope parameters on the plot.
+        ax: Optional Axes to plot on. If None, uses current axes.
+        report_params: Whether to print the estimated parameters to the console.
+        kwargs: Additional keyword arguments. Recognized:
+            halfplot (bool): If True, only plot the upper half of the envelope.
+            matplotlib.axes.Axes.plot kwargs: Any additional kwargs are forwarded to the ax.plot call for the envelope lines.
+    """
+    halfplot = False
+    if 'halfplot' in kwargs:
+        halfplot = kwargs['halfplot']
+        del kwargs['halfplot']
+    if ax is None:
+        ax = plt.gca()
+
+    p = [c.C for c in circles]
+    q = [c.R for c in circles]
+    tan_alpha, m = np.polyfit(p, q, 1)
+    phi = np.arcsin(tan_alpha)
+    c = m / np.cos(phi)
+    max_stress = max([c.C + c.R for c in circles]) if circles else 0
+    p_coulomb = np.linspace(
+        0 if not show_tension else -c/np.tan(phi), 
+        max_stress*1.05, 100)
+    q_coulomb = c + p_coulomb * np.tan(phi)
+    ax.plot(p_coulomb, q_coulomb, 'k--', label=f'Mohr-Coulomb Envelope (φ={np.degrees(phi):.2f}°, c={c:.2f})')
+    
+    if parameters_label:
+        label = f'c={c:.2f}\nφ={np.degrees(phi):.2f}°'
+        ax.annotate(label, xy=(p_coulomb[-1], q_coulomb[-1]), xytext=(30, 10), textcoords='offset points')
+
+    if not halfplot:
+        ax.plot(p_coulomb, -q_coulomb, 'k--', **kwargs)
+
+    if report_params:
+        print(f"Estimated Mohr-Coulomb parameters: c = {c:.2f}, φ = {np.degrees(phi):.2f}°")
+
+    return c, phi
+
 class MohrPlot:
 
     def __init__(self, **kwargs: Any) -> None:
@@ -27,6 +173,8 @@ class MohrPlot:
         consuming ``halfplot`` and ``show_tension``.
 
         Args:
+            show_tension: Whether to include negative normal stresses (tension) in the plot.
+            halfplot: If True, only plot the upper half of circles and envelopes.
             **kwargs: Figure options and plot behavior flags.
         """
 
@@ -108,8 +256,8 @@ class MohrPlot:
     def principal_stress_circle(
         self,
         p1: float | None = None,
-        p3: float | None = None,
         p2: float | None = None,
+        p3: float | None = None,
         label: str | None = None,
         num_points: int = 100,
     ) -> int:
@@ -126,7 +274,7 @@ class MohrPlot:
             int: Index of the newly stored circle.
         """
         circle = Circle(p1=p1, p3=p3, p2=p2)
-        x, y = circle.get_circle_points(num_points=num_points)
+        x, y = circle.get_circle_points(half_circle=self.halfplot, num_points=num_points)
         self.ax.plot(x, y, label=label)
         self.circles.append(circle)
         self._set_axes()
@@ -152,12 +300,8 @@ class MohrPlot:
         Returns:
             int: Index of the newly stored circle.
         """
-        circle = Circle(sigma_x=sigma_x, sigma_y=sigma_y, tau_xy=tau_xy)
-        x, y = circle.get_circle_points(num_points=num_points)
-        self.ax.plot(x, y, label=label)
-        self.circles.append(circle)
-
-        self.oriented_plane(circle.x_plane_angle, circle_index=len(self.circles)-1)
+        circle = oriented_circle(sigma_x=sigma_x, sigma_y=sigma_y, tau_xy=tau_xy, label=label, num_points=num_points, ax=self.ax)
+        self.circles.append(circle)        
         self._set_axes()
         return len(self.circles) - 1
 
@@ -182,44 +326,37 @@ class MohrPlot:
     def estimated_mc_envelope(
         self,
         circles: Sequence[int] | None = None,
-        label_line: bool = False,
+        parameters_label: bool = False,
     ) -> None:
         """Estimate and plot a linear Mohr-Coulomb envelope from circles.
 
         Args:
             circles: Optional indices of circles to include in the fit.
-            label_line: Whether to annotate the envelope parameters.
+            parameters_label: Whether to annotate the envelope parameters.
             plot_tension_cutoff: Reserved compatibility parameter.
         """
         if circles is None:
             selected_circles = self.circles
         else:
             selected_circles = [self.circles[i] for i in circles if i < len(self.circles)]
-        p = [c.C for c in selected_circles]
-        q = [c.R for c in selected_circles]
-        tan_alpha, m = np.polyfit(p, q, 1)
-        phi = np.arcsin(tan_alpha)
-        c = m / np.cos(phi)
-        self.mc_envelope(c, phi, label_line=label_line)
+        c, phi = estimated_mc_envelope(selected_circles, parameters_label=parameters_label, show_tension=self.show_tension, ax=self.ax)
+        # self.mc_envelope(c, phi, parameters_label=parameters_label)
+        self.mohrcoulomb_envelopes.append((c, phi))
+        self._set_axes()
 
     def mc_envelope(
         self,
         c: float,
         phi: float,
-        label_line: bool = False
+        parameters_label: bool = False
     ) -> None:
         """Plot a Mohr-Coulomb failure envelope.
 
         Args:
             c: Cohesion intercept.
             phi: Friction angle in radians.
-            label_line: Whether to annotate the line endpoint.
+            parameters_label: Whether to annotate the envelope parameters.
         """
+        mc_envelope(c, phi, parameters_label=parameters_label, show_tension=self.show_tension, ax=self.ax)
         self.mohrcoulomb_envelopes.append((c, phi))
-        p_coulomb = np.linspace(0 if not self.show_tension else -c/np.tan(phi), self.max_stress*1.05, 100)
-        q_coulomb = c + p_coulomb * np.tan(phi)
-        self.ax.plot(p_coulomb, q_coulomb, 'k--', label=f'Mohr-Coulomb Envelope (φ={np.degrees(phi):.2f}°, c={c:.2f})')
-        if label_line:
-            label = f'c={c:.2f}\nφ={np.degrees(phi):.2f}°'
-            self.ax.annotate(label, xy=(p_coulomb[-1], q_coulomb[-1]), xytext=(10, 10), textcoords='offset points')
         self._set_axes()

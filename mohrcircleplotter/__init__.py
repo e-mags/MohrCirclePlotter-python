@@ -9,4 +9,4 @@ liability for use of this software in engineering design or decision-making.
 Verify all results independently before use in practice.
 """
 
-from .plotter import MohrPlot
+from .plotter import *

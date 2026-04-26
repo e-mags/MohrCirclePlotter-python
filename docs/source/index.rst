@@ -8,12 +8,6 @@ Mohr Circle Plotter documentation
 
 This is the documentation for the Mohr Circle Plotter Python package, which provides tools for plotting basic Mohr's circle visualizations.
 
-.. toctree::
-   :maxdepth: 2
-   :caption: Contents:
-
-   modules
-
 License
 =======
 This software is provided for **educational and research purposes only**. Results produced by this package should not be used as the sole basis for engineering design decisions without independent verification by a qualified professional engineer.
@@ -108,6 +102,43 @@ A Mohr-Coulomb failure envelope can be estimated from the plotted circles using 
     plot.estimated_mc_envelope()
 
 .. figure:: _static/estimate_mc_envelope.png
+
+
+Usage with matplotlib.pyplot
+-------------------
+The plotting functions in this package are designed to work with Matplotlib's `pyplot` interface. If you want to use the plotting functions without creating a `MohrPlot` instance, you can do so by passing the current axes to the plotting functions, or by simply calling the function after `plt.figure`.
+
+.. code-block:: python
+
+    import matplotlib.pyplot as plt
+    from mohrcircleplotter import oriented_circle
+
+    # Create a new figure and axis
+    fig, ax = plt.subplots()
+
+    # Define some circles (sigma_x, sigma_y, tau_xy)
+    circles = [
+        (80, 30, 30),
+        (60, 20, 20),
+        (40, 10, 10)
+    ]
+
+    # Plot the circles on the current axis
+    for sigma_x, sigma_y, tau_xy in circles:
+        oriented_circle(sigma_x, sigma_y, tau_xy, ax=ax)
+
+    plt.gca().set_aspect('equal', adjustable='box')
+    plt.grid()
+
+.. figure:: _static/matplotlib_interface.png
+
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Contents:
+
+   modules
+
 
 Indices and tables
 ==================
