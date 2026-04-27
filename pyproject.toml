@@ -2,6 +2,9 @@
 requires = ["setuptools>=80", "wheel", "setuptools_scm[simple]>=9.2"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools_scm]
+local_scheme = "no-local-version"
+
 [project]
 name = "mohrcircleplotter"
 dynamic = ["version"]
