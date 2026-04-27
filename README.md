@@ -34,6 +34,6 @@ for sigma_x, sigma_y, tau_xy in circles:
 # Estimate and plot the Mohr-Coulomb failure envelope
 plot.estimated_mc_envelope()
 ```
-![This is the caption](docs/source/_static/estimate_mc_envelope.png)
+![Graph showing MC envelope estimated over Mohr's circles](https://github.com/e-mags/MohrCirclePlotter/raw/main/docs/source/_static/estimate_mc_envelope.png)
 
 
